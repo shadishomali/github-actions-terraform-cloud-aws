@@ -1,0 +1,128 @@
+name: "Terraform Workflow"
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch: # Enables manual trigger for the steps
+
+jobs:
+  # Job 1: Terraform Initialize
+  init:
+    name: "Terraform Initialize"
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Set Workspace
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "TF_WORKSPACE=production" >> $GITHUB_ENV
+          else
+            echo "TF_WORKSPACE=development" >> $GITHUB_ENV
+          fi
+
+      - name: Terraform Init
+        run: terraform init
+
+  # Job 2: Terraform Format
+  fmt:
+    name: "Terraform Format"
+    runs-on: ubuntu-22.04
+    needs: init
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Set Workspace
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "TF_WORKSPACE=production" >> $GITHUB_ENV
+          else
+            echo "TF_WORKSPACE=development" >> $GITHUB_ENV
+          fi
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+  # Job 3: Terraform Validate
+  validate:
+    name: "Terraform Validate"
+    runs-on: ubuntu-22.04
+    needs: fmt
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Set Workspace
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "TF_WORKSPACE=production" >> $GITHUB_ENV
+          else
+            echo "TF_WORKSPACE=development" >> $GITHUB_ENV
+          fi
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+  # Job 4: Terraform Plan
+  plan:
+    name: "Terraform Plan"
+    runs-on: ubuntu-22.04
+    needs: validate
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Set Workspace
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "TF_WORKSPACE=production" >> $GITHUB_ENV
+          else
+            echo "TF_WORKSPACE=development" >> $GITHUB_ENV
+          fi
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="aws_region=${{ secrets.AWS_REGION }}" \
+            -var="aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -var="aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -no-color -input=false -out=tfplan
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfplan
+          path: tfplan
